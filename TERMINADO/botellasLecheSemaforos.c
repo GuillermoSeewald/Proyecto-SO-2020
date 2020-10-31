@@ -14,7 +14,7 @@ typedef struct arguments params;
 
 sem_t heladera_llena;
 sem_t mutex_comprando;
-sem_t mutex_reponiendo;
+sem_t mutex_heladera_cerrada;
 
 void* companiero(void* args);
 
@@ -22,7 +22,7 @@ int main() {
 	pthread_t companieros[CANTIDAD_COMPANIEROS];
 	sem_init(&heladera_llena,0,CANTIDAD_BOTELLAS);
 	sem_init(&mutex_comprando,0,1);
-	sem_init(&mutex_reponiendo,0,1);
+	sem_init(&mutex_heladera_cerrada,0,1);
 	int i;
 	for (i=0; i<CANTIDAD_COMPANIEROS; i++) {
 		params* args = (params*) malloc(sizeof(params));
@@ -41,25 +41,26 @@ void* companiero(void* args) {
 	int i;
 	int num = arg->numeroCompaniero;
 	while(1) {
-		if (sem_trywait(&mutex_reponiendo) == 0) {
-			sem_post(&mutex_reponiendo);
+		if (sem_trywait(&mutex_heladera_cerrada) == 0) {
 			if (sem_trywait(&heladera_llena) == 0) {
 				printf("\e[%dmSoy el compañero %d\e[0m, tomando una botella de leche\n", 94+num, num);
+				sem_post(&mutex_heladera_cerrada);
 				sleep(1);
 			} else {
+				sem_post(&mutex_heladera_cerrada);
 				printf("\e[%dmSoy el compañero %d\e[0m, no hay mas leche, ¿ya fue alguien a comprar?\n", 94+num, num);
 				if (sem_trywait(&mutex_comprando) == 0) {
 					printf("\e[%dmSoy el compañero %d\e[0m, aún no fue nadie, yendo al supermercado\n", 94+num, num);
 					printf("\e[%dmSoy el compañero %d\e[0m, comprando botellas\n", 94+num, num);
 					sleep(2);
-					sem_wait(&mutex_reponiendo);
+					sem_wait(&mutex_heladera_cerrada);
 					for (i=0; i<CANTIDAD_BOTELLAS; i++) {
+						printf("\e[%dmSoy el compañero %d\e[0m, reponiendo botella nº %d\n", 94+num, num, (i+1));
 						sem_post(&heladera_llena);
 						sleep(1);
-						printf("\e[%dmSoy el compañero %d\e[0m, reponiendo botella nº %d\n", 94+num, num, (i+1));
 					}
 					printf("\e[%dmSoy el compañero %d\e[0m, ya repuse la heladera\n", 94+num, num);
-					sem_post(&mutex_reponiendo);
+					sem_post(&mutex_heladera_cerrada);
 					sleep(2);
 					sem_post(&mutex_comprando);
 				} else {
@@ -68,7 +69,7 @@ void* companiero(void* args) {
 				}
 			}
 		} else {
-			printf("\e[%dmSoy el compañero %d\e[0m, estan reponiendo la heladera, me voy a hacer otras cosas\n", 94+num, num);
+			printf("\e[%dmSoy el compañero %d\e[0m, la heladera está ocupada, me voy a hacer otras cosas\n", 94+num, num);
 			sleep(3);
 		}
 	}
