@@ -30,7 +30,6 @@ int main() {
     finishPartners(queueId, numPartners);
     printf("\n------SALIDA DETECTADA, ESPERANDO FINALIZACIÓN DEL TRABAJO ACTUAL DE LOS COMPAÑEROS------\n\n");
     waitProcess(numPartners);
-    printf("Remove queue\n");
     removeQueue(queueId);
 
     return 0;
