@@ -10,26 +10,26 @@
 int getNumPartners();
 key_t getKey();
 int getQueue(key_t key);
-void initQueue(int idQueue);
+void initQueue(int queueId);
 void initPartners(int numPartners);
 void waitProcess(int numPartners);
-void removeQueue(int idQueue);
+void removeQueue(int queueId);
 
 int main() {
     int numPartners = getNumPartners();
 	key_t key = getKey();
-    int idQueue = getQueue(key);
-    initQueue(idQueue);
+    int queueId = getQueue(key);
+    initQueue(queueId);
     initPartners(numPartners);
     waitProcess(numPartners);
-    removeQueue(idQueue);
+    removeQueue(queueId);
 
     return 0;
 }
 
 int getNumPartners() {
     int number;
-    printf("Ingrese la cantidad de compañeros\n");
+    printf("Ingrese la cantidad de compañeros: ");
     scanf("%d", &number);
     return number;
 }
@@ -46,30 +46,30 @@ key_t getKey() {
 
 int getQueue(key_t key) {
     //Se crea la cola de mensajes y se obtiene su id
-    int idQueue = msgget(key, 0777 | IPC_CREAT);
-	if(idQueue == -1){
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
 		perror("Error en la creacion de la cola de mensajes");
 		exit(-1);
 	}
-    return idQueue;
+    return queueId;
 }
 
-void initQueue(int idQueue) {
+void initQueue(int queueId) {
     msg msgTypeHeladeraLlena, msgTypeHeladeraCerrada, msgTypeNadieComprando;
-    msgTypeHeladeraLlena.id = TYPE_HELADERA_LLENA;
-    msgTypeHeladeraCerrada.id = TYPE_HELADERA_CERRADA;
-    msgTypeNadieComprando.id = TYPE_NADIE_COMPRANDO;
+    msgTypeHeladeraLlena.id = TYPE_FULL_FRIDGE;
+    msgTypeHeladeraCerrada.id = TYPE_CLOSED_FRIDGE;
+    msgTypeNadieComprando.id = TYPE_NOBODY_AT_STORE;
 
     // Agregando mensaje de heladera cerrada
-    msgsnd(idQueue, &msgTypeHeladeraCerrada, SIZE_MSG, IPC_NOWAIT);
+    msgsnd(queueId, &msgTypeHeladeraCerrada, SIZE_MSG, IPC_NOWAIT);
 
     // Agregando mensaje de nadie comprando
-    msgsnd(idQueue, &msgTypeNadieComprando, SIZE_MSG, IPC_NOWAIT);
+    msgsnd(queueId, &msgTypeNadieComprando, SIZE_MSG, IPC_NOWAIT);
 
     // Agregando mensajes para la cantidad de botellas
     int i;
-    for (i=0; i<CANTIDAD_BOTELLAS; i++) {
-        msgsnd(idQueue, &msgTypeHeladeraLlena, SIZE_MSG, IPC_NOWAIT);
+    for (i=0; i<BOTTLES; i++) {
+        msgsnd(queueId, &msgTypeHeladeraLlena, SIZE_MSG, IPC_NOWAIT);
     }
 }
 
@@ -79,7 +79,7 @@ void initPartners(int numPartners) {
         if (fork()==0) {
             char numeroCompaniero[30];
             sprintf(numeroCompaniero, "%d", (i+1));
-            char* args[] = {"./companiero", numeroCompaniero, NULL};
+            char* args[] = {"./partner", numeroCompaniero, NULL};
             execvp(args[0], args);
         }
     }
@@ -91,6 +91,6 @@ void waitProcess(int numPartners) {
         wait(NULL);
 }
 
-void removeQueue(int idQueue) {
-    msgctl (idQueue, IPC_RMID, (struct msqid_ds *)NULL);
+void removeQueue(int queueId) {
+    msgctl (queueId, IPC_RMID, (struct msqid_ds *)NULL);
 }
