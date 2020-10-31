@@ -9,6 +9,7 @@
 key_t getKey();
 int getQueue(key_t key);
 void execute(int queueId, int num);
+int finish(int queueId);
 int isFridgeClosed(int queueId);
 int isNotEmpty(int queueId);
 void drinkBottleMessage(int partnerId);
@@ -88,7 +89,7 @@ void execute(int queueId, int partnerId) {
     */
     /* ------------------------------------------------------------------- */
     /* ------------------------------------------------------------------- */
-    while(1) {
+    while(!finish(queueId)) {
         if (isFridgeClosed(queueId)) {
             if (isNotEmpty(queueId)) {
                 closeFridge(queueId);
@@ -111,6 +112,11 @@ void execute(int queueId, int partnerId) {
             fridgeAlreadyOpenMessage(partnerId);
         }
     }
+}
+
+int finish(int queueId) {
+    msg msgRcv;
+    return msgrcv(queueId, &msgRcv, SIZE_MSG, TYPE_FINISH, IPC_NOWAIT)!=-1;
 }
 
 int isFridgeClosed(int queueId) {

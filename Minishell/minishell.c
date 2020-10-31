@@ -81,7 +81,6 @@ void changeCommandNameArg(char** argv) {
     char command[100] = "./sources/";
     strcat(command, argv[0]);
     argv[0] = command;
-    printf("%s\n", argv[0]);
 }
 
 int exitCommand(char* commandName) {
