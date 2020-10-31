@@ -33,12 +33,10 @@ int main(int argc, char **argv) {
 	if (argc == 1) {
 		do {
 			printPath();
-			char* command = getCommand();
-			char* splitedArguments[MAXARGUMENTS];
-			splitArguments(command, splitedArguments);
-			__fpurge(stdin); // Limpia el buffer para la lectura del siguiente comando
-			selectCommand(splitedArguments);
-
+			char* args[MAXARGUMENTS];
+			splitArguments(getCommand(), args);
+			__fpurge(stdin); // Clean buffer
+			selectCommand(args);
 			exit++;
 			printf("Ejecucion numero %d\n", exit);
 		} while (exit<3);
@@ -46,14 +44,20 @@ int main(int argc, char **argv) {
 	return 0;
 }
 
+/*
+ * Print working path
+ */
 void printPath() {
 	char path[PATHSIZE];
 	getcwd(path, PATHSIZE);
 	printf("\e[93m%s $ \e[0m", path);
 }
 
+/*
+ * Read a command by standard input
+ */
 char* getCommand() {
-	char* newCommand = (char*) malloc(sizeof(char)*100);
+	char* newCommand = (char*) malloc(sizeof(char)*300);
 	scanf("%[^\n]s", newCommand);
 	return newCommand;
 }
@@ -61,18 +65,22 @@ char* getCommand() {
 /*
  * Split a string into the arguments of the sent command
  */
-void splitArguments(char* command, char* splitedArguments[]) {
+void splitArguments(char* command, char* args[]) {
 	int i = 0;
-	splitedArguments[0] = strtok(command, " ");
-	while (i < MAXARGUMENTS && splitedArguments[i] != NULL) {
+	args[0] = strtok(command, " ");
+	while (i < MAXARGUMENTS && args[i] != NULL) {
 		i++;
-		splitedArguments[i] = strtok(NULL, " ");
+		args[i] = strtok(NULL, " ");
 	}
 }
 
-int selectCommand(char* splitedArguments[]) {
+/*
+ * Detects which command was selected and executes its corresponding set of instructions
+ * with the necessary args
+ */
+int selectCommand(char* args[]) {
 	int exit = 0;
-	lsDir(splitedArguments[1]);
+	lsFile(args[1]);
 	/*
 	int i = 0;
 	while (i<SIZECOMMANDS && !strcmp(commands[i], splitedArguments[0])) {
@@ -132,6 +140,7 @@ int selectCommand(char* splitedArguments[]) {
 	}*/
 	return exit;
 }
+
 /**
 *@brief Crea un directorio/s
 *@param  dir direccion del directorio a crear
@@ -143,6 +152,7 @@ void createDir(char* dir){
 		 		perror("Error al crear directorio %s \n");
 	 }
 }
+
 /**
 *@brief Elimina directorio
 *@param dir directorio a eliminar
@@ -152,6 +162,7 @@ void removeDir(char* dir) {
 		perror("Remove dir");
 	}
 }
+
 /**
 *@brief Crea un archivo
 *@param file archivo a crear
@@ -194,6 +205,7 @@ void lsFile(char *file){
 			fclose(fptr);
 		}
 }
+
 /**
 *@brief Modifica los permisos de un archivo
 *@param path Direcion del archivo

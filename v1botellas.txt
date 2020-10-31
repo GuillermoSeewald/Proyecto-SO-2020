@@ -1,0 +1,20 @@
+
+
+void compañero() {
+	while(1) {
+		wait (mutex_reponiendo)
+		signal (mutex_reponiendo);
+		if (trywait(heladera_llena)) {
+			tomando
+		} else {
+			if (trywait(en_supermercado)) {
+				yendo al supermercado
+				wait(mutex_reponiendo)
+				for (i=0; i<cantidad_de_leches)
+					signal(heladera_llena)
+				signal(mutex_reponiendo)
+				signal(en_supermercado)
+			}
+		}
+	}
+}
