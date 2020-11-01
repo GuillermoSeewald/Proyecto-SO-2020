@@ -66,6 +66,7 @@ void execute(char** argv) {
     pid_t pid = fork();
     if (pid==0) {
         changeCommandNameArg(argv);
+        int i;
         execvp(argv[0], argv);
         perror("Invalid command");
         exit(INVALID_COMMAND);
