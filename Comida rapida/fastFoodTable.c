@@ -16,10 +16,10 @@
 
 sem_t foodQueueFull;
 sem_t foodQueueEmpty;
-sem_t cleantrles;
+sem_t cleanTables;
 sem_t orderFood;
 sem_t deliveredFood;
-sem_t dirtytrles;
+sem_t dirtyTables;
 sem_t print;
 
 char* defaultCenterText;
@@ -73,10 +73,10 @@ void threads() {
 void initSemaphores() {
     sem_init(&foodQueueFull, 0, 0);
     sem_init(&foodQueueEmpty, 0, FOOD_QUEUE_SIZE);
-    sem_init(&cleantrles, 0, TABLES);
+    sem_init(&cleanTables, 0, TABLES);
     sem_init(&orderFood, 0, 0);
     sem_init(&deliveredFood, 0, 0);
-    sem_init(&dirtytrles, 0, 0);
+    sem_init(&dirtyTables, 0, 0);
     sem_init(&print, 0, 1);
 }
 
@@ -84,12 +84,19 @@ void initSemaphores() {
 void destroySemaphores() {
     sem_destroy(&foodQueueFull);
     sem_destroy(&foodQueueEmpty);
-    sem_destroy(&cleantrles);
+    sem_destroy(&cleanTables);
     sem_destroy(&orderFood);
     sem_destroy(&deliveredFood);
-    sem_destroy(&dirtytrles);
+    sem_destroy(&dirtyTables);
 }*/
 
+/*
+ * ALGORITMO COCINERO:
+    - repetir:
+        - espero que se libere un espacio de comida -> wait(foodQueueEmpty)
+        - preparo comida
+        - brindo una nueva comida a la cola -> signal(foodQueueFull)
+ */
 void* chefWork(void* args) {
     int id = *((int*) args);
     int columnNumber = 1;
@@ -103,6 +110,16 @@ void* chefWork(void* args) {
     pthread_exit(NULL);
 }
 
+/*
+ * ALGORITMO CLIENTE:
+    - repetir:
+        - espero mesa limpia disponible -> wait(cleanTables)
+        - ir a mesa
+        - pedir comida -> signal(orderFood)
+        - esperar comida -> wait(deliveredFood)
+        - comer
+        - libero la mesa (es decir, deja una mesa sucia) -> signal(dirtyTables)
+ */
 void* customerWork(void* args) {
     int id = *((int*) args);
     int columnNumber = 0;
@@ -118,18 +135,26 @@ void* customerWork(void* args) {
     sprintf(text5, "%d comio y se va", id);
     while (1) {
         tr(columnNumber, text1);
-        sem_wait(&cleantrles);
+        sem_wait(&cleanTables);
         tr(columnNumber, text2);
         sem_post(&orderFood);
         tr(columnNumber, text3);
         sem_wait(&deliveredFood);
         tr(columnNumber, text4);
         tr(columnNumber, text5);
-        sem_post(&dirtytrles);
+        sem_post(&dirtyTables);
     }
     pthread_exit(NULL);
 }
 
+/*
+ * ALGORITMO CAMARERO:
+    - repetir:
+        - espero a que haya un pedido -> wait(orderFood)
+        - espero a que haya una comida -> wait(foodQueueFull)
+        - saco una comida de la cola de comidas -> signal(foodQueueEmpty)
+        - llevo la comida a un cliente -> signal(deliveredFood)
+ */
 void* waiterWork(void* args) {
     int columnNumber = 2;
     char* text1 = (char*) malloc(sizeof(COLUMN_SIZE));
@@ -151,6 +176,13 @@ void* waiterWork(void* args) {
     pthread_exit(NULL);
 }
 
+/*
+ * ALGORITMO LIMPIADOR:
+    - repetir:
+        - espero a que haya una mesa sucia -> wait(dirtyTables)
+        - limpio mesa mesa
+        - nueva mesa limpia libre -> signal(cleanTables)
+ */
 void* cleanerWork(void* args) {
     int columnNumber = 3;
     char* text1 = (char*) malloc(sizeof(COLUMN_SIZE));
@@ -162,13 +194,19 @@ void* cleanerWork(void* args) {
 
     while (1) {
         tr(columnNumber, text1);
-        sem_wait(&dirtytrles);
+        sem_wait(&dirtyTables);
         tr(columnNumber, text2);
         tr(columnNumber, text3);
-        sem_post(&cleantrles);
+        sem_post(&cleanTables);
     }
     pthread_exit(NULL);
 }
+
+
+
+// --------------------------------------------------------------------
+// Metódos para el formato de salida
+// --------------------------------------------------------------------
 
 void tableHeader() {
     char* headerSep = (char*) malloc(sizeof(COLUMN_SIZE));
