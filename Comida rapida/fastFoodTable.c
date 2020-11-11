@@ -5,8 +5,6 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#define EATING_TIME 2
-#define CLEANING_TIME 1
 #define CUSTOMERS 50
 #define CHEFS 3
 #define TABLES 30
@@ -20,7 +18,6 @@ sem_t cleanTables;
 sem_t orderFood;
 sem_t deliveredFood;
 sem_t dirtyTables;
-sem_t print;
 
 char* defaultCenterText;
 
@@ -77,7 +74,6 @@ void initSemaphores() {
     sem_init(&orderFood, 0, 0);
     sem_init(&deliveredFood, 0, 0);
     sem_init(&dirtyTables, 0, 0);
-    sem_init(&print, 0, 1);
 }
 
 /*
