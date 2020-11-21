@@ -9,7 +9,7 @@
 void checkArguments(int argc);
 int isHelpArgument(char* arg);
 void help();
-void execute(char* dirName, char* mode);
+void execute(char* filename, char* mode);
 long getMode(char* mode);
 
 int main(int argc, char **argv) {
@@ -23,7 +23,7 @@ int main(int argc, char **argv) {
 }
 
 void checkArguments(int argc) {
-    if (argc < 2 || argc > 3) {
+    if (argc != 3) {
         printf("Cantidad de argumentos incorrecta, utilice -help para más información\n");
         exit(MISSING_ARGUMENTS);
     }
@@ -35,26 +35,24 @@ int isHelpArgument(char* arg) {
 
 void help() {
     printf("Modo de empleo:\n");
-    printf("  mkdir directory [mode]  Crea un directorio, si es que aún no existe\n");
-    printf("                          El argumento opcional mode especifica los permisos para el nuevo directorio\n");
-    printf("                          Si el mode no es especificado, se utiliza por defecto los permisos 0777\n");
-    printf("  mkdir -help             Muestra esta ayuda y finaliza\n");
+    printf("  chmod filename mode     Modifica los permisos del archivo (filename) indicado con el valor administrado (mode).\n");
+    printf("  chmod -help             Muestra esta ayuda y finaliza\n");
 }
 
-void execute(char* dirName, char* mode) {
+void execute(char* filename, char* mode) {
     long m =  getMode(mode);
-    printf("Creando directorio <%s> con permisos <%lo>\n", dirName, m);
+    printf("Modificando el archivo <%s>, estableciendo permisos <%lo>\n", filename, m);
 
-    if(mkdir(dirName, m)){
-    	perror("Error al crear directorio");
+    if(chmod(filename, m)){
+    	perror("Error al modificar los permisos");
         exit(2);
     } else
-        printf("Directorio <%s> creado correctamente\n", dirName);
+        printf("Permisos modificados correctamente para el archivo %s\n", filename);
 }
 
 long getMode(char* mode) {
     char *extra;
-    long conv = strtol("0777", &extra, 8);
+    long conv;
     if (mode!=NULL){
         errno = 0;
         conv = strtol(mode, &extra, 8);

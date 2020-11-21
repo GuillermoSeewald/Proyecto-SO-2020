@@ -1,9 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 #include "errors.h"
 
 void checkArguments(int argc);
@@ -18,6 +15,7 @@ int main(int argc, char **argv) {
     } else {
         execute(argv[1]);
     }
+
     exit(0);
 }
 
@@ -34,11 +32,26 @@ int isHelpArgument(char* arg) {
 
 void help() {
     printf("Modo de empleo:\n");
+    printf("  lsfile directory         Lista el contenido de la carpeta directory especificada\n");
+    printf("  lsfile -help             Muestra esta ayuda y finaliza\n");
 }
 
-void execute(char* dirName) {
-    if(rmdir(dirName)){
-    	perror("Error al eliminar el directorio");
-        exit(2);
+void execute(char* filename) {
+    FILE *file = fopen(filename, "r");
+    char* line = NULL;
+    size_t len = 0;
+    size_t read;
+
+    if (file == NULL){
+        printf("El archivo solicitado no existe dentro del directorio actual.\n");
+    }
+    else{
+        while ((read = getline(&line, &len, file)) != (size_t) -1){
+            printf("%s", line);
+        }
+
+        fclose(file);
+        if (line)
+            free(line);
     }
 }

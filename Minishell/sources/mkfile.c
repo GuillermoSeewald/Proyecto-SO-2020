@@ -1,9 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
 #include <errno.h>
 #include <limits.h>
+#include <fcntl.h>
 #include "errors.h"
 
 void checkArguments(int argc);
@@ -35,21 +35,21 @@ int isHelpArgument(char* arg) {
 
 void help() {
     printf("Modo de empleo:\n");
-    printf("  mkdir directory [mode]  Crea un directorio, si es que aún no existe\n");
-    printf("                          El argumento opcional mode especifica los permisos para el nuevo directorio\n");
-    printf("                          Si el mode no es especificado, se utiliza por defecto los permisos 0777\n");
-    printf("  mkdir -help             Muestra esta ayuda y finaliza\n");
+    printf("  mkfile filename [mode]    Crea un directorio, si es que aún no existe\n");
+    printf("                            El argumento opcional mode especifica los permisos para el nuevo directorio\n");
+    printf("                            Si el mode no es especificado, se utiliza por defecto los permisos 0777\n");
+    printf("  mkfile -help              Muestra esta ayuda y finaliza\n");
 }
 
-void execute(char* dirName, char* mode) {
+void execute(char* filename, char* mode) {
     long m =  getMode(mode);
-    printf("Creando directorio <%s> con permisos <%lo>\n", dirName, m);
+    printf("Creando archivo <%s> con permisos <%lo>\n", filename, m);
 
-    if(mkdir(dirName, m)){
-    	perror("Error al crear directorio");
+    if(creat(filename, m)==-1){
+    	perror("Error al crear archivo");
         exit(2);
     } else
-        printf("Directorio <%s> creado correctamente\n", dirName);
+        printf("Archivo <%s> creado correctamente\n", filename);
 }
 
 long getMode(char* mode) {
