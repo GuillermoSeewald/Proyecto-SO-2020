@@ -25,6 +25,13 @@ typedef struct messageCantidad {
 
 int pipeA[2], pipeB[2], pipeC[2], pipeCoordinador[2];
 
+void createPipes();
+void createProcesses();
+void coordinateTasks();
+void finishProcesses();
+void fourTasks();
+void fiveTasks();
+void sixTasks();
 void funcionA();
 void funcionB();
 void funcionC();
@@ -33,16 +40,30 @@ void* tareaB(void* args);
 void* tareaC(void* args);
 
 
-
-
 int main() {
-    int i, leido;
+    createPipes();
+    createProcesses();
 
+    close(pipeA[0]);
+    close(pipeB[0]);
+    close(pipeA[0]);
+    close(pipeCoordinador[1]);
+    coordinateTasks();
+    close(pipeA[1]);
+    close(pipeB[1]);
+    close(pipeA[1]);
+    close(pipeCoordinador[0]);
+}
+
+void createPipes() {
     if((pipe(pipeA) == -1) || (pipe(pipeB)==-1) || (pipe(pipeC)==-1) || (pipe(pipeCoordinador)==-1)){
         perror("Pipe");
         exit(-1);
     }
+}
 
+void createProcesses() {
+    int i;
     for (i=0; i<3; i++) {
         pid_t pid = fork();
         if (pid == 0) {
@@ -63,61 +84,80 @@ int main() {
             exit(-1);
         }
     }
+}
 
-
-    msgCantidad msg;
-    int end = 0;
-    close(pipeA[0]);
-    close(pipeB[0]);
-    close(pipeA[0]);
-    close(pipeCoordinador[1]);
-    while (!end) {
+void coordinateTasks() {
+    int read = 1;
+    while (read) {
         printf("Ingrese la cantidad de tareas a ejecutar, debe estar entre 4 y 6\n");
-        scanf("%d\n", &leido);
-        while (leido<4 || leido>6) {
+        scanf("%d", &read);
+        while (read<4 || read>6) {
             printf("Opción no válida, ingrese nuevamente\n");
-            scanf("%d\n", &leido);
+            scanf("%d", &read);
         }
 
-        switch (leido) {
+        switch (read) {
             case (4):
-                printf("Ejecutando 4 tareas\n");
-                msg.cantidadTareas = 2;
-                write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
-                write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                printf("Terminaron las 4 tareas\n");
+                fourTasks();
                 break;
             case (5):
-                printf("Ejecutando 5 tareas\n");
-                msg.cantidadTareas = 2;
-                write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
-                write(pipeC[1], &msg, SIZE_MSG_CANTIDAD);
-                msg.cantidadTareas = 1;
-                write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                printf("Terminaron las 5 tareas\n");
+                fiveTasks();
                 break;
             case (6):
-                printf("Ejecutando 6 tareas\n");
-                msg.cantidadTareas = 2;
-                write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
-                write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
-                write(pipeC[1], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
-                printf("Terminaron las 6 tareas\n");
+                sixTasks();
                 break;
         }
         printf("¿Desea seguir ejecutando? 1->si, 0->no\n");
-        scanf("%d\n", &end);
+        scanf("%d", &read);
     }
-
+    finishProcesses();
     printf("TERMINA LA EJECUCION\n");
+}
+
+void finishProcesses() {
+    msgCantidad msg;
+    msg.cantidadTareas = -1;
+    write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeC[1], &msg, SIZE_MSG_CANTIDAD);
+}
+
+void fourTasks() {
+    msgCantidad msg;
+    printf("Ejecutando 4 tareas\n");
+    msg.cantidadTareas = 2;
+    write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    printf("Terminaron las 4 tareas\n");
+}
+
+void fiveTasks() {
+    msgCantidad msg;
+    printf("Ejecutando 5 tareas\n");
+    msg.cantidadTareas = 2;
+    write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeC[1], &msg, SIZE_MSG_CANTIDAD);
+    msg.cantidadTareas = 1;
+    write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    printf("Terminaron las 5 tareas\n");
+}
+
+void sixTasks() {
+    msgCantidad msg;
+    printf("Ejecutando 6 tareas\n");
+    msg.cantidadTareas = 2;
+    write(pipeA[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeB[1], &msg, SIZE_MSG_CANTIDAD);
+    write(pipeC[1], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    read(pipeCoordinador[0], &msg, SIZE_MSG_CANTIDAD);
+    printf("Terminaron las 6 tareas\n");
 }
 
 void funcionA() {
@@ -149,6 +189,8 @@ void funcionA() {
         }
         write(pipeCoordinador[1], "1", 2);
     }
+    close(pipeA[0]);
+    close(pipeCoordinador[1]);
     exit(0);
 }
 
@@ -180,6 +222,8 @@ void funcionB() {
         }
         write(pipeCoordinador[1], "1", 2);
     }
+    close(pipeB[0]);
+    close(pipeCoordinador[1]);
     exit(0);
 }
 
@@ -212,19 +256,22 @@ void funcionC() {
         }
         write(pipeCoordinador[1], "1", 2);
     }
+    close(pipeC[0]);
+    close(pipeCoordinador[1]);
     exit(0);
 }
 
 void* tareaA(void* args) {
     msgA msg = (struct messageTareaA*) args;
     int parcial = msg->tipo;
-    printf("Pintando de color %d, el tipo es %d\n", msg->color, parcial);
+    printf("TAREA A: Pintando de color %d, el tipo es %d\n", msg->color, parcial);
     if (parcial) {
         sleep(TIME);
     } else
         sleep(TIME*2);
-    printf("Termino la tarea A\n");
 
+    printf("Termino una TAREA A\n");
+    free(msg);
     pthread_exit(NULL);
 }
 
@@ -232,12 +279,14 @@ void* tareaB(void* args) {
     msgB msg = (struct messageTareaBC*) args;
     int verificacion = msg->tipo;
 
-    printf("Realizando trabajo en los frenos, el tipo es %d\n", verificacion);
+    printf("TAREA B: Realizando trabajo en los frenos, el tipo es %d\n", verificacion);
     if (verificacion)
         sleep(TIME);
     else
         sleep(TIME*2);
 
+    printf("Termino una TAREA B\n");
+    free(msg);
     pthread_exit(NULL);
 }
 
@@ -245,11 +294,13 @@ void* tareaC(void* args) {
     msgC msg = (struct messageTareaBC*) args;
     int reparacion = msg->tipo;
 
-    printf("Realizando trabajo en una rueda, el tipo es %d\n", reparacion);
+    printf("TAREA C: Realizando trabajo en una rueda, el tipo es %d\n", reparacion);
     if (reparacion)
         sleep(TIME);
     else
         sleep(TIME*3);
 
+    printf("Termino una TAREA C\n");
+    free(msg);
     pthread_exit(NULL);
 }
