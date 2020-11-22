@@ -30,7 +30,6 @@ int main() {
     initSemaphores();
     tableHeader();
     threads();
-    tableFooter();
     destroySemaphores();
     return 0;
 }
@@ -38,7 +37,6 @@ int main() {
 void threads() {
     pthread_t customerThreads[CUSTOMERS], chefThreads[CHEFS], waiterThread, cleanerThread;
     int i;
-    char finish;
     for (i=0; i<CUSTOMERS; i++) {
         int* id = (int*) malloc(sizeof(int));
         *id = (i+1);
@@ -49,22 +47,15 @@ void threads() {
         *id = (i+1);
         pthread_create(&chefThreads[i], NULL, chefWork, (void*) id);
     }
-
     pthread_create(&waiterThread, NULL, waiterWork, NULL);
     pthread_create(&cleanerThread, NULL, cleanerWork, NULL);
-
-    // Finaliza al detectar el enter
-    scanf("%c", &finish);
 
 
     for (i=0; i<CUSTOMERS; i++) {
         pthread_join(customerThreads[i], NULL);
     }
-
     pthread_join(waiterThread, NULL);
-
     pthread_join(cleanerThread, NULL);
-
     for (i=0; i<CHEFS; i++) {
         pthread_join(chefThreads[i], NULL);
     }
