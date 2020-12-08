@@ -57,38 +57,39 @@ int getQueue(key_t key) {
         perror("Error en la creacion de la cola de mensajes");
         exit(-1);
     }
+    return queueId;
 }
 
+/* ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- */
+/* ALGORITMO */
+
+/*
+iterar
+    si la heladera no está ocupada
+    |   ocupo la heladera
+    |   si hay botellas
+    |   |   saco una botella
+    |   |   libero la heladera
+    |   |   tomo la botella
+    |   sino
+    |       libero la heladera
+    |       si nadie fue al supermercado
+    |       |   voy al supermercado
+    |       |   espero a que la heladera esté desocupada
+    |       |   ocupo la heladera
+    |       |   lleno la heladera con las botellas comprads
+    |       |   libero la heladera
+    |       |   notifico que ya volvi del supermercado
+    |       sino
+    |           espero haciendo otras cosas
+    sino
+        espero haciendo otras cosas
+
+*/
+/* ------------------------------------------------------------------- */
+/* ------------------------------------------------------------------- */
 void execute(int queueId, int partnerId) {
-    /* ------------------------------------------------------------------- */
-    /* ------------------------------------------------------------------- */
-    /* ALGORITMO */
-
-    /*
-    iterar
-        si la heladera no está ocupada
-        |   ocupo la heladera
-        |   si hay botellas
-        |   |   saco una botella
-        |   |   libero la heladera
-        |   |   tomo la botella
-        |   sino
-        |       libero la heladera
-        |       si nadie fue al supermercado
-        |       |   voy al supermercado
-        |       |   espero a que la heladera esté desocupada
-        |       |   ocupo la heladera
-        |       |   lleno la heladera con las botellas comprads
-        |       |   libero la heladera
-        |       |   notifico que ya volvi del supermercado
-        |       sino
-        |           espero haciendo otras cosas
-        sino
-            espero haciendo otras cosas
-
-    */
-    /* ------------------------------------------------------------------- */
-    /* ------------------------------------------------------------------- */
     while(!finish(queueId)) {
         if (isFridgeClosed(queueId)) {
             if (isNotEmpty(queueId)) {

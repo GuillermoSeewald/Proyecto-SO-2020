@@ -23,9 +23,14 @@ int main(int argc, char **argv) {
 }
 
 void checkArguments(int argc) {
-    if (argc < 2 || argc > 3) {
-        printf("Cantidad de argumentos incorrecta, utilice -help para más información\n");
+    if (argc < 2) {
+        printf("Argumentos faltantes, utilice -help para más información\n");
         exit(MISSING_ARGUMENTS);
+    } else {
+        if (argc > 3) {
+            printf("Demasiados argumentos, utilice -help para más información\n");
+            exit(EXCEEDED_ARGUMENTS);
+        }
     }
 }
 
@@ -59,7 +64,7 @@ long getMode(char* mode) {
         errno = 0;
         conv = strtol(mode, &extra, 8);
         if (errno != 0 || *extra != '\0' || conv > INT_MAX) {
-            printf("Valor para el parámetro mode no válido, debe ser un entero positivo");
+            printf("Valor para el parámetro mode no válido, debe ser un entero positivo\n");
             exit(INVALID_ARGUMENTS);
         }
     }

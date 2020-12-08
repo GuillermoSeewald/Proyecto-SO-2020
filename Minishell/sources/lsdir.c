@@ -25,9 +25,9 @@ int main(int argc, char **argv) {
 }
 
 void checkArguments(int argc) {
-    if (argc < 1 || argc > 2) {
-        printf("Cantidad de argumentos incorrecta, utilice -help para más información\n");
-        exit(MISSING_ARGUMENTS);
+    if (argc > 2) {
+        printf("Demasiados argumentos, utilice -help para más información\n");
+        exit(EXCEEDED_ARGUMENTS);
     }
 }
 

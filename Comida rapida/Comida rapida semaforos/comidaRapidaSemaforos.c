@@ -5,7 +5,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include "./Table/table.h"
+#include "../Table/table.h"
 #define CUSTOMERS 50
 #define CHEFS 3
 #define TABLES 30
@@ -93,7 +93,7 @@ void* chefWork(void* args) {
     sprintf(text, "%d prepara comida", *id);
     while (1) {
         sem_wait(&foodQueueEmpty);
-        tableRow(columnNumber, text);
+        tableRow(columnNumber, text); // Metodo para imprimir en forma de tabla.
         sem_post(&foodQueueFull);
     }
     free(id);
@@ -124,7 +124,7 @@ void* customerWork(void* args) {
     sprintf(text4, "%d obtuvo comida", *id);
     sprintf(text5, "%d comio y se va", *id);
     while (1) {
-        tableRow(columnNumber, text1);
+        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
         sem_wait(&cleanTables);
         tableRow(columnNumber, text2);
         sem_post(&orderFood);
@@ -155,7 +155,7 @@ void* waiterWork(void* args) {
 
     while (1) {
         sem_wait(&orderFood);
-        tableRow(columnNumber, text1);
+        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
         sem_wait(&foodQueueFull);
         tableRow(columnNumber, text2);
         sem_post(&foodQueueEmpty);
@@ -180,7 +180,7 @@ void* cleanerWork(void* args) {
     char text4[] = "Me voy";
 
     while (1) {
-        tableRow(columnNumber, text1);
+        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
         sem_wait(&dirtyTables);
         tableRow(columnNumber, text2);
         tableRow(columnNumber, text3);

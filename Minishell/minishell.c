@@ -5,9 +5,10 @@
 #include <stdio_ext.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <errno.h>
+#include "./sources/errors.h"
 #define MAXARGUMENTS 6
 #define PATHSIZE 100
-#define INVALID_COMMAND 1
 
 void printPath();
 char* getCommand();
@@ -19,6 +20,9 @@ int exitCommand(char* commandName);
 int main() {
     int exit = 0;
     char* command;
+    printf("----------------------------------------------------------------------\n");
+    printf("\t\tBienvenido a la mini shell\n");
+    printf("----------------------------------------------------------------------\n");
     do {
         printPath();
         char* argv[MAXARGUMENTS];
@@ -31,8 +35,7 @@ int main() {
         free(command);
         printf("\n");
     } while (!exit);
-    printf("Gracias por venir, vuelva prontos\n");
-    return 0;
+    return SUCESS;
 }
 
 /*
@@ -87,13 +90,18 @@ void execute(char** argv) {
     if (pid==0) {
         changeCommandNameArg(argv);
         execvp(argv[0], argv);
-        perror("Invalid command");
-        exit(INVALID_COMMAND);
+        if (errno == ENOENT) {
+            printf("Error: El comando solicitado no existe\n");
+            exit(INVALID_COMMAND);
+        } else {
+            perror("Error al intentar ejecutar el comando");
+            exit(EXECVP_ERROR);
+        }
     } else {
         if (pid>0)
             wait(NULL);
         else
-            perror("No se pudo ejecutar el comando: \n");
+            perror("No se pudo ejecutar el comando\n");
     }
 }
 

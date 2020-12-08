@@ -17,10 +17,13 @@ typedef struct messageTaskValues {
 } msgTaskValues;
 
 typedef struct messageThread {
-    struct messageTaskValues* values;
-    sem_t* nextTask;
-    sem_t* initTask;
-    sem_t* finishTask;
+    struct messageTaskValues** buffer;
+    int* writePos;
+    int* readPos;
+    int bufferSize;
+    sem_t* mutexBuffer;
+    sem_t* endedTask;
+    sem_t* fullBuffer;
 } msgThread;
 
 int pipeA[2], pipeB[2], pipeC[2], pipeCoordinador[2];
@@ -225,15 +228,22 @@ void taskCreator(void* taskWork(void*), int* mainPipe) {
     msgThread msgThread;
     int maxThreads = 2;
     pthread_t threads[maxThreads];
-    sem_t nTask, startTask, endTask;
+    sem_t mutexBuffer, fullBuffer, endedTask;
 
-    msgThread.values = (struct messageTaskValues*) malloc(sizeof(struct messageTaskValues));
-    sem_init(&nTask, 0, 1);
-    sem_init(&startTask, 0, 0);
-    sem_init(&endTask, 0, 0);
-    msgThread.nextTask = &nTask;
-    msgThread.initTask = &startTask;
-    msgThread.finishTask = &endTask;
+    msgThread.buffer = (struct messageTaskValues**) malloc(sizeof(struct messageTaskValues)*maxThreads);
+    for (i=0; i<maxThreads; i++)
+        msgThread.buffer[i] = (struct messageTaskValues*) malloc(sizeof(struct messageTaskValues));
+    msgThread.writePos = (int*) malloc(sizeof(int));
+    msgThread.readPos = (int*) malloc(sizeof(int));
+    *(msgThread.writePos) = 0;
+    *(msgThread.readPos) = 0;
+    msgThread.bufferSize = maxThreads;
+    sem_init(&mutexBuffer, 0, 1);
+    sem_init(&fullBuffer, 0, 0);
+    sem_init(&endedTask, 0, 0);
+    msgThread.mutexBuffer = &mutexBuffer;
+    msgThread.fullBuffer = &fullBuffer;
+    msgThread.endedTask = &endedTask;
 
     for (i=0; i<maxThreads; i++)
         pthread_create(&threads[i], NULL, taskWork, (void*) &msgThread);
@@ -242,28 +252,33 @@ void taskCreator(void* taskWork(void*), int* mainPipe) {
         read(mainPipe[0], &cantidad, sizeof(int));
         if (cantidad!=-1) {
             for(i=0; i<cantidad; i++) {
-                sem_wait(&nTask);
-                read(mainPipe[0], msgThread.values, SIZE_MSG_TASK_VALUES);
-                sem_post(&startTask);
+                sem_wait(&mutexBuffer);
+                read(mainPipe[0], msgThread.buffer[*(msgThread.writePos)], SIZE_MSG_TASK_VALUES);
+                *(msgThread.writePos) = (*(msgThread.writePos) + 1) % msgThread.bufferSize;
+                sem_post(&fullBuffer);
+                sem_post(&mutexBuffer);
             }
             for (i=0; i<cantidad; i++) {
-                sem_wait(&endTask);
+                sem_wait(&endedTask);
             }
         }
         write(pipeCoordinador[1], &cantidad, sizeof(int));
     }
 
-    free(msgThread.values);
+    for (i=0; i<maxThreads; i++)
+        free(msgThread.buffer[i]);
+    free(msgThread.buffer);
+    free(msgThread.writePos);
+    free(msgThread.readPos);
+    close(mainPipe[0]);
+    close(pipeCoordinador[1]);
+    sem_destroy(&mutexBuffer);
+    sem_destroy(&fullBuffer);
+    sem_destroy(&endedTask);
 
     for (i=0; i<maxThreads; i++) {
         pthread_join(threads[i], NULL);
     }
-
-    close(mainPipe[0]);
-    close(pipeCoordinador[1]);
-    sem_destroy(&nTask);
-    sem_destroy(&startTask);
-    sem_destroy(&endTask);
     exit(0);
 }
 
@@ -273,10 +288,12 @@ void* tareaA(void* args) {
     char* color;
 
     while (1) {
-        sem_wait(msg.initTask);
-        parcial = msg.values->type;
-        col = msg.values->extraArg;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        parcial = msg.buffer[*(msg.readPos)]->type;
+        col = msg.buffer[*(msg.readPos)]->extraArg;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         color = pickColor(col);
         if (parcial) {
@@ -289,7 +306,7 @@ void* tareaA(void* args) {
 
         free(color);
         printf("\t\tTerminó una TAREA A\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);
@@ -300,9 +317,11 @@ void* tareaB(void* args) {
     int verificacion;
 
     while (1) {
-        sem_wait(msg.initTask);
-        verificacion = msg.values->type;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        verificacion = msg.buffer[*(msg.readPos)]->type;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         if (verificacion) {
             printf("\t\tTAREA B: Realizando verificación de frenos, requiere una unidad de tiempo\n");
@@ -313,7 +332,7 @@ void* tareaB(void* args) {
         }
 
         printf("\t\tTerminó una TAREA B\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);
@@ -324,10 +343,12 @@ void* tareaC(void* args) {
     int reparacion, ruedas;
 
     while (1) {
-        sem_wait(msg.initTask);
-        reparacion = msg.values->type;
-        ruedas = msg.values->extraArg;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        reparacion = msg.buffer[*(msg.readPos)]->type;
+        ruedas = msg.buffer[*(msg.readPos)]->extraArg;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         if (reparacion) {
             printf("\t\tTAREA C: Realizando trabajo de reparación de ruedas, hay %d rueda/s que necesita/n reparación, se requiere/n %d unidad/es de tiempo\n", ruedas, reparacion);
@@ -339,7 +360,7 @@ void* tareaC(void* args) {
         }
 
         printf("\t\tTerminó una TAREA C\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);

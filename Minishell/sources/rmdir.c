@@ -22,9 +22,14 @@ int main(int argc, char **argv) {
 }
 
 void checkArguments(int argc) {
-    if (argc != 2) {
-        printf("Cantidad de argumentos incorrecta, utilice -help para más información\n");
+    if (argc < 2) {
+        printf("Argumentos faltantes, utilice -help para más información\n");
         exit(MISSING_ARGUMENTS);
+    } else {
+        if (argc > 2) {
+            printf("Cantidad de argumentos máxima excedida, utilice -help para más información\n");
+            exit(EXCEEDED_ARGUMENTS);
+        }
     }
 }
 
@@ -34,6 +39,8 @@ int isHelpArgument(char* arg) {
 
 void help() {
     printf("Modo de empleo:\n");
+    printf("  rmdir directory     Elimina un directorio\n");
+    printf("  rmdir -help         Muestra esta ayuda y finaliza\n");
 }
 
 void execute(char* dirName) {
