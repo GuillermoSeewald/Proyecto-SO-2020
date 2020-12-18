@@ -17,13 +17,14 @@ typedef struct waiterMessage {
     char deliveringVegeOrderMessage[COLUMN_SIZE];
     char noMeatMenuMessage[COLUMN_SIZE];
     char noVegeMenuMessage[COLUMN_SIZE];
-    char finish[COLUMN_SIZE];
-} *waiterMsg;
+} waiterMsg;
 
+waiterMsg messages;
 
-waiterMsg getWaiterMessages();
+void getWaiterMessages();
 void waiterWork();
-int finish(int queueId);
+key_t getKey();
+int getQueue(key_t key);
 
 int main(int argc, char **argv) {
     if (argc == 1) {
@@ -39,78 +40,78 @@ int main(int argc, char **argv) {
 /*
  * ALGORITMO CAMARERO:
     - repetir:
-        - si hay un pedido de menu carne
-            - si hay preparado un menu carne
-                - notifico que saque un menu carne
-                - entrego el menu de carne al cliente
-            - sino
-                - vuelvo a dejar el pedido de menu carne como pendiente
-        - si hay un pedido de menu vegetariano
-            - si hay preparado un menu vegetariano
-                - notifico que saque un menu vegetariano
-                - entrego el menu vegetariano al cliente
-            - sino
-                - vuelvo a dejar el pedido de menu vegatariano como pendiente
+        - espero a que haya un pedido
+        - si el pedido es un menu de carne
+            - espero a que haya un menu de carne preparado
+            - obtengo el menu de carne
+            - notifico que saque un menu de carne
+            - entrego el menu de carne al cliente
+        - sino, si el pedido es un menu vegetariano
+            - espero a que haya un menu vegetariano preparado
+            - obtengo el menu vegetariano
+            - notifico que saque un menu vegetariano
+            - entrego el menu vegetariano al cliente
  */
 void waiterWork() {
-    waiterMsg printMsgs = getWaiterMessages();
+    getWaiterMessages();
     int columnNumber = 2;
     msg msg;
     int queueId = getQueue(getKey());
 
-    while (!finish(queueId)) {
-        if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_ORDER_MEAT_MENU, IPC_NOWAIT) != -1) {
-            tableRow(columnNumber, printMsgs->takingMeatOrderMessage);
-            if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_MEAT_QUEUE_FULL, IPC_NOWAIT) != -1) {
-                tableRow(columnNumber, printMsgs->gettingMeatMenuMessage);
-                msg.id = TYPE_MEAT_QUEUE_EMPTY;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-                tableRow(columnNumber, printMsgs->deliveringMeatOrderMessage);
-                msg.id = TYPE_DELIVERED_MEAT_MENU;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            } else {
-                tableRow(columnNumber, printMsgs->noMeatMenuMessage);
-                msg.id = TYPE_ORDER_MEAT_MENU;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            }
-        }
-
-        if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_ORDER_VEG_MENU, IPC_NOWAIT) != -1) {
-            tableRow(columnNumber, printMsgs->takingVegeOrderMessage);
-            if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_VEG_QUEUE_FULL, IPC_NOWAIT) != -1) {
-                tableRow(columnNumber, printMsgs->gettingVegeMenuMessage);
-                msg.id = TYPE_VEG_QUEUE_EMPTY;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-                tableRow(columnNumber, printMsgs->deliveringVegeOrderMessage);
-                msg.id = TYPE_DELIVERED_VEG_MENU;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            } else {
-                tableRow(columnNumber, printMsgs->noVegeMenuMessage);
-                msg.id = TYPE_ORDER_VEG_MENU;
-                msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            }
+    while (1) {
+        msgrcv(queueId, &msg, SIZE_MSG, TYPE_ORDER_MENU, 0);
+        if (msg.menu == MENU_MEAT) {
+            tableRow(columnNumber, messages.takingMeatOrderMessage);
+            msgrcv(queueId, &msg, SIZE_MSG, TYPE_MEAT_QUEUE_FULL, 0);
+            tableRow(columnNumber, messages.gettingMeatMenuMessage);
+            msg.id = TYPE_QUEUE_EMPTY;
+            msg.menu = MENU_MEAT;
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+            tableRow(columnNumber, messages.deliveringMeatOrderMessage);
+            msg.id = TYPE_DELIVERED_MEAT_MENU;
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+        } else {
+            tableRow(columnNumber, messages.takingVegeOrderMessage);
+            msgrcv(queueId, &msg, SIZE_MSG, TYPE_VEGE_QUEUE_FULL, 0);
+            tableRow(columnNumber, messages.gettingVegeMenuMessage);
+            msg.id = TYPE_QUEUE_EMPTY;
+            msg.menu = MENU_VEGE;
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+            tableRow(columnNumber, messages.deliveringVegeOrderMessage);
+            msg.id = TYPE_DELIVERED_VEG_MENU;
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
         }
     }
-
-    tableRow(columnNumber, printMsgs->finish);
-    free(printMsgs);
 }
 
-int finish(int queueId) {
-    msg msg;
-    return msgrcv(queueId, &msg, SIZE_MSG, TYPE_FINISH_WAITER, IPC_NOWAIT) != -1;
+key_t getKey() {
+	key_t key = ftok(PATH, 1);
+	if(key == (key_t)-1){
+		perror("Error al obtener la clave de la cola de mensajes");
+		exit(-1);
+	}
+    return key;
 }
 
-waiterMsg getWaiterMessages() {
-    waiterMsg msg = (struct waiterMessage*) malloc(sizeof(struct waiterMessage));
-    sprintf(msg->takingMeatOrderMessage, "Tome un pedido carne");
-    sprintf(msg->gettingMeatMenuMessage, "Obtuve menu carne");
-    sprintf(msg->deliveringMeatOrderMessage, "Entregue pedido carne");
-    sprintf(msg->noMeatMenuMessage, "Faltan menu carne");
-    sprintf(msg->takingVegeOrderMessage, "Tome un pedido vege");
-    sprintf(msg->gettingVegeMenuMessage, "Obtuve menu vege");
-    sprintf(msg->deliveringVegeOrderMessage, "Entregue pedido vege");
-    sprintf(msg->noMeatMenuMessage, "Faltan menu vege");
-    sprintf(msg->finish, "Me voy");
-    return msg;
+int getQueue(key_t key) {
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
+		perror("Error en la creacion de la cola de mensajes");
+		exit(-1);
+	}
+    return queueId;
+}
+
+
+
+
+void getWaiterMessages() {
+    sprintf(messages.takingMeatOrderMessage, "Tome un pedido carne");
+    sprintf(messages.gettingMeatMenuMessage, "Obtuve menu carne");
+    sprintf(messages.deliveringMeatOrderMessage, "Entregue pedido carne");
+    sprintf(messages.noMeatMenuMessage, "Faltan menu carne");
+    sprintf(messages.takingVegeOrderMessage, "Tome un pedido vege");
+    sprintf(messages.gettingVegeMenuMessage, "Obtuve menu vege");
+    sprintf(messages.deliveringVegeOrderMessage, "Entregue pedido vege");
+    sprintf(messages.noMeatMenuMessage, "Faltan menu vege");
 }

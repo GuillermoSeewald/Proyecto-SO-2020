@@ -17,21 +17,23 @@
 void initQueue(int queueId);
 void tableHeader();
 void childProcess();
-void finishProcess(int queueId);
+void waitChildProcess();
 void removeQueue(int queueId);
+key_t getKey();
+int getQueue(key_t key);
+void setTerminationHandler();
 
 int main() {
     printf("--------------------------------------------------------------------------------\n");
     printf("\tEJERCICIO DE COMIDA RAPIDA CON COLA DE MENSAJES\n");
-    printf("\n\tPresione <ENTER> para finalizar la ejecución\n");
     printf("--------------------------------------------------------------------------------\n");
     sleep(2);
     int queueId = getQueue(getKey());
     initQueue(queueId);
     tableHeader();
     childProcess();
-    finishProcess(queueId);
-    tableFooter();
+    setTerminationHandler();
+    waitChildProcess();
     removeQueue(queueId);
     return 0;
 }
@@ -39,12 +41,17 @@ int main() {
 void initQueue(int queueId) {
     int i;
     msg msg;
-    msg.id = TYPE_MEAT_QUEUE_EMPTY;
-    for (i=0; i<FOOD_MEAT_QUEUE_SIZE; i++)
+
+    msg.id = TYPE_QUEUE_EMPTY;
+    for (i=0; i<FOOD_MEAT_QUEUE_SIZE; i++) {
+        msg.menu = MENU_MEAT;
         msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-    msg.id = TYPE_VEG_QUEUE_EMPTY;
-    for (i=0; i<FOOD_VEG_QUEUE_SIZE; i++)
+    }
+    msg.id = TYPE_QUEUE_EMPTY;
+    for (i=0; i<FOOD_VEG_QUEUE_SIZE; i++) {
+        msg.menu = MENU_VEGE;
         msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+    }
     msg.id = TYPE_CLEAN_TABLES;
     for (i=0; i<TABLES; i++)
         msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
@@ -93,37 +100,56 @@ void childProcess() {
     }
 }
 
-void finishProcess(int queueId) {
-    char finish;
-    scanf("%c", &finish);
+void waitChildProcess() {
     int i;
-    msg msg;
-
-    // Finaliza los clientes
-    msg.id = TYPE_FINISH_CUSTOMER;
-    for (i=0; i<CUSTOMERS; i++) {
-        msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+    for (i=0; i<CUSTOMERS; i++)
         wait(NULL);
-    }
-
-    // Finaliza el camarero
-    msg.id = TYPE_FINISH_WAITER;
-    msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-    wait(NULL);
-
-    // Finaliza el limpiador
-    msg.id = TYPE_FINISH_CLEANER;
-    msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-    wait(NULL);
-
-    // Finaliza los cocineros
-    msg.id = TYPE_FINISH_CHEF;
-    for (i=0; i<CHEFS; i++) {
-        msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+    for (i=0; i<CHEFS; i++)
         wait(NULL);
-    }
+    wait(NULL);
+    wait(NULL);
+}
+
+void terminationHandler(int signum) {
+    kill(0, SIGTERM);
+}
+
+void sigterm(int signum) {
+}
+
+void setTerminationHandler() {
+    struct sigaction endAction, termAction;
+
+    endAction.sa_handler = terminationHandler;
+    sigemptyset(&endAction.sa_mask);
+    endAction.sa_flags = 0;
+
+    termAction.sa_handler = sigterm;
+    sigemptyset(&termAction.sa_mask);
+    termAction.sa_flags = 0;
+
+    sigaction(SIGTERM, &termAction, NULL),
+    sigaction(SIGINT, &endAction, NULL);
 }
 
 void removeQueue(int queueId) {
     msgctl(queueId, IPC_RMID, (struct msqid_ds*) NULL);
+}
+
+key_t getKey() {
+	key_t key = ftok(PATH, 1);
+	if(key == (key_t)-1){
+		perror("Error al obtener la clave de la cola de mensajes");
+		exit(-1);
+	}
+    return key;
+}
+
+int getQueue(key_t key) {
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
+		perror("Error en la creacion de la cola de mensajes");
+		exit(-1);
+	}
+    return queueId;
 }

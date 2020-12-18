@@ -1,3 +1,3 @@
 clear
-gcc conjuntoTareas.c -lpthread -o conjuntoTareas
+gcc conjuntoTareas.c -lpthread -o conjuntoTareas -Wall
 ./conjuntoTareas

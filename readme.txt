@@ -1,2 +1,0 @@
-Para ejecutar los diferentes programas ejecute por consola los archivos .sh deseados.
-En caso de que obtenga un mensaje de error con permiso denegado, vaya a propiedades del archivo y modifique en la sección permisos marcando la casilla de permitir ejecutar el archivo como un programa.

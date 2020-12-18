@@ -14,12 +14,14 @@ typedef struct cleanerMessage {
     char waitingDirtyTableMessage[COLUMN_SIZE];
     char cleaningTableMessage[COLUMN_SIZE];
     char tableCleanedMessage[COLUMN_SIZE];
-    char finish[COLUMN_SIZE];
-} *cleanerMsg;
+} cleanerMsg;
 
-int finish(int queueId);
+cleanerMsg messages;
+
 void cleanerWork();
-cleanerMsg getCleanerMessages();
+void getCleanerMessages();
+key_t getKey();
+int getQueue(key_t key);
 
 int main(int argc, char **argv) {
     if (argc == 1) {
@@ -35,45 +37,49 @@ int main(int argc, char **argv) {
 /*
  * ALGORITMO LIMPIADOR:
     - repetir:
-        - si hay una mesa sucia
-            - limpio mesa mesa
-            - nueva mesa limpia libre
+        - espero a que haya una mesa sucia
+        - limpio la mesa sucia detectaad
+        - notifico que hay una mesa limpia
  */
 void cleanerWork() {
-    cleanerMsg printMsgs = getCleanerMessages();
+    getCleanerMessages();
     int columnNumber = 3;
     msg msg;
     int queueId = getQueue(getKey());
-    tableRow(columnNumber, printMsgs->waitingDirtyTableMessage);
-    while (!finish(queueId)) {
-        // Mira si hay mesa sucia. Se hace no bloqueante por una cuestión de que
-        // pueda detectar el finish en la siguiente iteración en caso de que no haya
-        // mas clientes (debido a que fueron terminados).
-        if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_DIRTY_TABLES, IPC_NOWAIT)!=-1) {
-            tableRow(columnNumber, printMsgs->cleaningTableMessage);
-            tableRow(columnNumber, printMsgs->tableCleanedMessage);
-            msg.id = TYPE_CLEAN_TABLES;
-            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            tableRow(columnNumber, printMsgs->waitingDirtyTableMessage);
-        }
+
+    while (1) {
+        tableRow(columnNumber, messages.waitingDirtyTableMessage);
+        msgrcv(queueId, &msg, SIZE_MSG, TYPE_DIRTY_TABLES, 0);
+        tableRow(columnNumber, messages.cleaningTableMessage);
+        tableRow(columnNumber, messages.tableCleanedMessage);
+        msg.id = TYPE_CLEAN_TABLES;
+        msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
     }
+}
 
-    tableRow(columnNumber, printMsgs->finish);
-    free(printMsgs);
+key_t getKey() {
+	key_t key = ftok(PATH, 1);
+	if(key == (key_t)-1){
+		perror("Error al obtener la clave de la cola de mensajes");
+		exit(-1);
+	}
+    return key;
+}
+
+int getQueue(key_t key) {
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
+		perror("Error en la creacion de la cola de mensajes");
+		exit(-1);
+	}
+    return queueId;
 }
 
 
-int finish(int queueId) {
-    msg msg;
-    return msgrcv(queueId, &msg, SIZE_MSG, TYPE_FINISH_CLEANER, IPC_NOWAIT) != -1;
-}
 
 
-cleanerMsg getCleanerMessages() {
-    cleanerMsg msg = (struct cleanerMessage*) malloc(sizeof(struct cleanerMessage));
-    sprintf(msg->waitingDirtyTableMessage, "Esperando una mesa sucia");
-    sprintf(msg->cleaningTableMessage, "Limpiando una mesa");
-    sprintf(msg->tableCleanedMessage, "Limpie una mesa");
-    sprintf(msg->finish, "Me voy");
-    return msg;
+void getCleanerMessages() {
+    sprintf(messages.waitingDirtyTableMessage, "Esperando una mesa sucia");
+    sprintf(messages.cleaningTableMessage, "Limpiando una mesa");
+    sprintf(messages.tableCleanedMessage, "Limpie una mesa");
 }

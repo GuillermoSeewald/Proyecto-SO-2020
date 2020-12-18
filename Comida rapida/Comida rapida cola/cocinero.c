@@ -11,12 +11,15 @@
 typedef struct chefMessage {
     char cookingMeatMenuMessage[COLUMN_SIZE];
     char cookingVegeMenuMessage[COLUMN_SIZE];
-    char finish[COLUMN_SIZE];
-} *chefMsg;
+} chefMsg;
 
-chefMsg getChefMessages(int id);
+chefMsg messages;
+
+void getChefMessages(int id);
 void chefWork(int id);
-int finish(int queueId);
+key_t getKey();
+int getQueue(key_t key);
+
 
 int main(int argc, char **argv) {
     if (argc == 2) {
@@ -33,43 +36,54 @@ int main(int argc, char **argv) {
 /*
  * ALGORITMO COCINERO:
     - repetir:
-        - si hay espacio en la cola de comida de carne
+        - espero a que haya espacio en alguna de las colas de comida
+        - si la cola de comida que tiene espacio es la cola de comida de carne
             - preparo un menu de carne
-        - si hay espacio en la cola de comida vegetariana
+        - sino (la cola de comida que tiene espacio es la cola de comida vegetariana)
             - preparo un menu vegetariano
  */
 void chefWork(int id) {
-    chefMsg printMsgs = getChefMessages(id);
+    getChefMessages(id);
     int columnNumber = 1;
     msg msg;
     int queueId = getQueue(getKey());
 
-    while (!finish(queueId)) {
-        if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_MEAT_QUEUE_EMPTY, IPC_NOWAIT) != -1) {
+    while (1) {
+        msgrcv(queueId, &msg, SIZE_MSG, TYPE_QUEUE_EMPTY, 0);
+        if (msg.menu == MENU_MEAT) {
             msg.id = TYPE_MEAT_QUEUE_FULL;
+            tableRow(columnNumber, messages.cookingMeatMenuMessage);
             msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            tableRow(columnNumber, printMsgs->cookingMeatMenuMessage);
-        }
-        if (msgrcv(queueId, &msg, SIZE_MSG, TYPE_VEG_QUEUE_EMPTY, IPC_NOWAIT) != -1) {
-            msg.id = TYPE_VEG_QUEUE_FULL;
+        } else {
+            msg.id = TYPE_VEGE_QUEUE_FULL;
+            tableRow(columnNumber, messages.cookingVegeMenuMessage);
             msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-            tableRow(columnNumber, printMsgs->cookingVegeMenuMessage);
         }
     }
-
-    tableRow(columnNumber, printMsgs->finish);
-    free(printMsgs);
 }
 
-int finish(int queueId) {
-    msg msg;
-    return msgrcv(queueId, &msg, SIZE_MSG, TYPE_FINISH_CHEF, IPC_NOWAIT) != -1;
+key_t getKey() {
+	key_t key = ftok(PATH, 1);
+	if(key == (key_t)-1){
+		perror("Error al obtener la clave de la cola de mensajes");
+		exit(-1);
+	}
+    return key;
 }
 
-chefMsg getChefMessages(int id) {
-    chefMsg msg = (struct chefMessage*) malloc(sizeof(struct chefMessage));
-    sprintf(msg->cookingMeatMenuMessage, "%d preparo menu carne", id);
-    sprintf(msg->cookingVegeMenuMessage, "%d preparo menu vege", id);
-    sprintf(msg->finish, "%d se va", id);
-    return msg;
+int getQueue(key_t key) {
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
+		perror("Error en la creacion de la cola de mensajes");
+		exit(-1);
+	}
+    return queueId;
+}
+
+
+
+
+void getChefMessages(int id) {
+    sprintf(messages.cookingMeatMenuMessage, "%d preparo menu carne", id);
+    sprintf(messages.cookingVegeMenuMessage, "%d preparo menu vege", id);
 }

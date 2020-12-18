@@ -89,11 +89,11 @@ void destroySemaphores() {
 void* chefWork(void* args) {
     int* id = ((int*) args);
     int columnNumber = 1;
-    char text[COLUMN_SIZE];
-    sprintf(text, "%d prepara comida", *id);
+    char cocinando[COLUMN_SIZE];
+    sprintf(cocinando, "%d prepara comida", *id);
     while (1) {
         sem_wait(&foodQueueEmpty);
-        tableRow(columnNumber, text); // Metodo para imprimir en forma de tabla.
+        tableRow(columnNumber, cocinando); // Metodo para imprimir en forma de tabla.
         sem_post(&foodQueueFull);
     }
     free(id);
@@ -113,25 +113,25 @@ void* chefWork(void* args) {
 void* customerWork(void* args) {
     int *id = ((int*) args);
     int columnNumber = 0;
-    char text1[COLUMN_SIZE];
-    char text2[COLUMN_SIZE];
-    char text3[COLUMN_SIZE];
-    char text4[COLUMN_SIZE];
-    char text5[COLUMN_SIZE];
-    sprintf(text1, "%d espera mesa", *id);
-    sprintf(text2, "%d obtuvo mesa", *id);
-    sprintf(text3, "%d pidio comida", *id);
-    sprintf(text4, "%d obtuvo comida", *id);
-    sprintf(text5, "%d comio y se va", *id);
+    char esperoMesa[COLUMN_SIZE];
+    char obtuveMesa[COLUMN_SIZE];
+    char pidoComida[COLUMN_SIZE];
+    char obtuveComida[COLUMN_SIZE];
+    char comi[COLUMN_SIZE];
+    sprintf(esperoMesa, "%d espera mesa", *id);
+    sprintf(obtuveMesa, "%d obtuvo mesa", *id);
+    sprintf(pidoComida, "%d pidio comida", *id);
+    sprintf(obtuveComida, "%d obtuvo comida", *id);
+    sprintf(comi, "%d comio y se va", *id);
     while (1) {
-        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
+        tableRow(columnNumber, esperoMesa); // Metodo para imprimir en forma de tabla.
         sem_wait(&cleanTables);
-        tableRow(columnNumber, text2);
+        tableRow(columnNumber, obtuveMesa);
         sem_post(&orderFood);
-        tableRow(columnNumber, text3);
+        tableRow(columnNumber, pidoComida);
         sem_wait(&deliveredFood);
-        tableRow(columnNumber, text4);
-        tableRow(columnNumber, text5);
+        tableRow(columnNumber, obtuveComida);
+        tableRow(columnNumber, comi);
         sem_post(&dirtyTables);
     }
 
@@ -149,17 +149,17 @@ void* customerWork(void* args) {
  */
 void* waiterWork(void* args) {
     int columnNumber = 2;
-    char text1[] = "Tome un pedido";
-    char text2[] = "Saque una comida";
-    char text3[] = "Entregue pedido";
+    char tomePedido[] = "Tome un pedido";
+    char saqueComida[] = "Saque una comida";
+    char entreguePedido[] = "Entregue pedido";
 
     while (1) {
         sem_wait(&orderFood);
-        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
+        tableRow(columnNumber, tomePedido); // Metodo para imprimir en forma de tabla.
         sem_wait(&foodQueueFull);
-        tableRow(columnNumber, text2);
+        tableRow(columnNumber, saqueComida);
         sem_post(&foodQueueEmpty);
-        tableRow(columnNumber, text3);
+        tableRow(columnNumber, entreguePedido);
         sem_post(&deliveredFood);
     }
     pthread_exit(NULL);
@@ -174,18 +174,16 @@ void* waiterWork(void* args) {
  */
 void* cleanerWork(void* args) {
     int columnNumber = 3;
-    char text1[] = "Inactivo";
-    char text2[] = "Limpiando mesa";
-    char text3[] = "Ya limpie";
-    char text4[] = "Me voy";
+    char inactivo[] = "Inactivo";
+    char limpiando[] = "Limpiando mesa";
+    char termineLimpiar[] = "Ya limpie";
 
     while (1) {
-        tableRow(columnNumber, text1); // Metodo para imprimir en forma de tabla.
+        tableRow(columnNumber, inactivo); // Metodo para imprimir en forma de tabla.
         sem_wait(&dirtyTables);
-        tableRow(columnNumber, text2);
-        tableRow(columnNumber, text3);
+        tableRow(columnNumber, limpiando);
+        tableRow(columnNumber, termineLimpiar);
         sem_post(&cleanTables);
     }
-    tableRow(columnNumber, text4);
     pthread_exit(NULL);
 }

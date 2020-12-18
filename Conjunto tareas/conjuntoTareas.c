@@ -9,18 +9,21 @@
 #include <semaphore.h>
 #include <string.h>
 #define TIME 1
-#define SIZE_MSG_TASK_VALUES sizeof(struct messageTaskValues)
+#define SIZE_MSG_TASK_VALUES sizeof(struct messageTaskData)
 
-typedef struct messageTaskValues {
+typedef struct messageTaskData {
     int type;
     int extraArg;
-} msgTaskValues;
+} msgTaskData;
 
 typedef struct messageThread {
-    struct messageTaskValues* values;
-    sem_t* nextTask;
-    sem_t* initTask;
-    sem_t* finishTask;
+    struct messageTaskData** buffer;
+    int* writePos;
+    int* readPos;
+    int bufferSize;
+    sem_t* mutexBuffer;
+    sem_t* endedTask;
+    sem_t* fullBuffer;
 } msgThread;
 
 int pipeA[2], pipeB[2], pipeC[2], pipeCoordinador[2];
@@ -53,6 +56,10 @@ int main() {
     close(pipeCoordinador[0]);
 }
 
+/*
+ * Crea los diferentes pipes que van a ser utilizados para la comunicación entre
+ * los diferentes procesos.
+ */
 void createPipes() {
     if((pipe(pipeA) == -1) || (pipe(pipeB)==-1) || (pipe(pipeC)==-1) || (pipe(pipeCoordinador)==-1)){
         perror("Pipe");
@@ -60,6 +67,10 @@ void createPipes() {
     }
 }
 
+/*
+ * Crea los 3 procesos adicionales requeridos, los cuales manejaran la cantidad
+ * de un tipo determinado de tareas.
+ */
 void createProcesses() {
     int i;
     for (i=0; i<3; i++) {
@@ -102,6 +113,9 @@ void createProcesses() {
     }
 }
 
+/*
+ * Lee y ejecuta la cantidad de tareas a ejecutar en el ciclo actual.
+ */
 void coordinateTasks() {
     int read = 1;
     int invalidInput;
@@ -142,8 +156,13 @@ void finishProcesses() {
     write(pipeC[1], &size, sizeof(int));
 }
 
+/*
+ * Crea una cantidad igual a size de datos para tareas de tipo A y comunica dichos
+ * datos al proceso A a través del pipeA
+ * @param size: cantidad de datos a crear
+ */
 void createValuesTasksA(int size) {
-    msgTaskValues msg;
+    msgTaskData msg;
     int i;
     write(pipeA[1], &size, sizeof(int));
     for (i=0; i<size; i++) {
@@ -153,8 +172,13 @@ void createValuesTasksA(int size) {
     }
 }
 
+/*
+ * Crea una cantidad igual a size de datos para tareas de tipo B y comunica dichos
+ * datos al proceso B a través del pipeB
+ * @param size: cantidad de datos a crear
+ */
 void createValuesTasksB(int size) {
-    msgTaskValues msg;
+    msgTaskData msg;
     int i;
     write(pipeB[1], &size, sizeof(int));
     for (i=0; i<size; i++) {
@@ -163,8 +187,13 @@ void createValuesTasksB(int size) {
     }
 }
 
+/*
+ * Crea una cantidad igual a size de datos para tareas de tipo C y comunica dichos
+ * datos al proceso C a través del pipeC
+ * @param size: cantidad de datos a crear
+ */
 void createValuesTasksC(int size) {
-    msgTaskValues msg;
+    msgTaskData msg;
     int i;
     write(pipeC[1], &size, sizeof(int));
     for (i=0; i<size; i++) {
@@ -174,6 +203,11 @@ void createValuesTasksC(int size) {
     }
 }
 
+/*
+ * Se encarga de la sincronización cuando se tienen que ejecutar 4 tareas en el
+ * ciclo actual. Se indica que se tienn que ejecutar dos tareas de tipo A y dos
+ * tareas de tipo B y se espera a que se finalicen dichas tareas.
+ */
 void fourTasks() {
     int value;
     printf("\n-------------------------------------------------------------------\n");
@@ -188,6 +222,12 @@ void fourTasks() {
     printf("-------------------------------------------------------------------\n\n");
 }
 
+/*
+ * Se encarga de la sincronización cuando se tienen que ejecutar 5 tareas en el
+ * ciclo actual. Se indica que se tienn que ejecutar dos tareas de tipo A, una
+ * tarea de tipo B y dos tareas de tipo C y luego se espera a que se finalicen
+ * dichas tareas.
+ */
 void fiveTasks() {
     int value;
     printf("\n-------------------------------------------------------------------\n");
@@ -204,6 +244,12 @@ void fiveTasks() {
     printf("-------------------------------------------------------------------\n\n");
 }
 
+/*
+ * Se encarga de la sincronización cuando se tienen que ejecutar 5 tareas en el
+ * ciclo actual. Se indica que se tienn que ejecutar dos tareas de tipo A, dos
+ * tareas de tipo B y dos tareas de tipo C y luego se espera a que se finalicen
+ * dichas tareas.
+ */
 void sixTasks() {
     int value;
     printf("\n-------------------------------------------------------------------\n");
@@ -220,63 +266,93 @@ void sixTasks() {
     printf("-------------------------------------------------------------------\n\n");
 }
 
+/*
+ * Funcionalidad principal de los procesos hijos. Se encarga de la coordinación
+ * de una x cantidad de tareas de un cierto tipo.
+ * @param taskWork: conjunto de instrucciones que ejecutaran los hilos creados
+ *                  por el proceso.
+ * @param mainPipe: pipe mediante el cual el proceso recibirá los datos requeridos
+ */
 void taskCreator(void* taskWork(void*), int* mainPipe) {
     int i, cantidad = 0;
-    msgThread msgThread;
+    msgThread msgThread; // Contendrá los datos requeridos por un hilo para su trabajo.
     int maxThreads = 2;
     pthread_t threads[maxThreads];
-    sem_t nTask, startTask, endTask;
+    sem_t mutexBuffer, fullBuffer, endedTask;
 
-    msgThread.values = (struct messageTaskValues*) malloc(sizeof(struct messageTaskValues));
-    sem_init(&nTask, 0, 1);
-    sem_init(&startTask, 0, 0);
-    sem_init(&endTask, 0, 0);
-    msgThread.nextTask = &nTask;
-    msgThread.initTask = &startTask;
-    msgThread.finishTask = &endTask;
+    // Buffer mediante el cual el proceso envía datos a los hilos
+    msgThread.buffer = (struct messageTaskData**) malloc(sizeof(struct messageTaskData)*maxThreads);
+    for (i=0; i<maxThreads; i++)
+        msgThread.buffer[i] = (struct messageTaskData*) malloc(sizeof(struct messageTaskData));
 
+    // Punteros de lectura y escritura en el buffer
+    msgThread.writePos = (int*) malloc(sizeof(int));
+    msgThread.readPos = (int*) malloc(sizeof(int));
+    *(msgThread.writePos) = 0;
+    *(msgThread.readPos) = 0;
+    msgThread.bufferSize = maxThreads;
+
+    // Semaforos con los cuales se realizará la sincronización entre el proceso y los hilos
+    sem_init(&mutexBuffer, 0, 1); // Exclusividad de acceso al buffer.
+    sem_init(&fullBuffer, 0, 0); // Notificación de que se cargó un dato en el buffer.
+    sem_init(&endedTask, 0, 0); // Notificación por parte del hilo que terminó su trabajo.
+    msgThread.mutexBuffer = &mutexBuffer;
+    msgThread.fullBuffer = &fullBuffer;
+    msgThread.endedTask = &endedTask;
+
+    // Se inicializan los hilos
     for (i=0; i<maxThreads; i++)
         pthread_create(&threads[i], NULL, taskWork, (void*) &msgThread);
 
+    // Una cantidad de -1 indica que el usuario indicó la finalización
     while(cantidad!=-1) {
-        read(mainPipe[0], &cantidad, sizeof(int));
+        read(mainPipe[0], &cantidad, sizeof(int)); // Se lee la cantidad de tareas a ejecutar.
         if (cantidad!=-1) {
             for(i=0; i<cantidad; i++) {
-                sem_wait(&nTask);
-                read(mainPipe[0], msgThread.values, SIZE_MSG_TASK_VALUES);
-                sem_post(&startTask);
+                sem_wait(&mutexBuffer); // Exclusividad de acceso al buffer.
+                read(mainPipe[0], msgThread.buffer[*(msgThread.writePos)], SIZE_MSG_TASK_VALUES); // Se lee un dato para una tarea.
+                *(msgThread.writePos) = (*(msgThread.writePos) + 1) % msgThread.bufferSize; // Se modifica el puntero de escritura del buffer.
+                sem_post(&fullBuffer); // Se notifica que se escribió un dato en el buffer.
+                sem_post(&mutexBuffer); // Se libera la exclusividad del buffer.
             }
             for (i=0; i<cantidad; i++) {
-                sem_wait(&endTask);
+                sem_wait(&endedTask); // Se espera a que finalice cada una de las tareas.
             }
         }
-        write(pipeCoordinador[1], &cantidad, sizeof(int));
+        write(pipeCoordinador[1], &cantidad, sizeof(int)); // Se notifica al proceso coordinador que se terminó.
     }
 
-    free(msgThread.values);
-
-    for (i=0; i<maxThreads; i++) {
-        pthread_join(threads[i], NULL);
-    }
+    for (i=0; i<maxThreads; i++)
+        free(msgThread.buffer[i]);
+    free(msgThread.buffer);
+    free(msgThread.writePos);
+    free(msgThread.readPos);
 
     close(mainPipe[0]);
     close(pipeCoordinador[1]);
-    sem_destroy(&nTask);
-    sem_destroy(&startTask);
-    sem_destroy(&endTask);
+
+    sem_destroy(&mutexBuffer);
+    sem_destroy(&fullBuffer);
+    sem_destroy(&endedTask);
+
     exit(0);
 }
 
+/*
+ * Funcionalidad que debe seguir una tarea de tipo A.
+ */
 void* tareaA(void* args) {
     msgThread msg = *((struct messageThread*) args);
     int parcial, col;
     char* color;
 
     while (1) {
-        sem_wait(msg.initTask);
-        parcial = msg.values->type;
-        col = msg.values->extraArg;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        parcial = msg.buffer[*(msg.readPos)]->type;
+        col = msg.buffer[*(msg.readPos)]->extraArg;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         color = pickColor(col);
         if (parcial) {
@@ -289,20 +365,25 @@ void* tareaA(void* args) {
 
         free(color);
         printf("\t\tTerminó una TAREA A\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);
 }
 
+/*
+ * Funcionalidad que debe seguir una tarea de tipo B.
+ */
 void* tareaB(void* args) {
     msgThread msg = *((struct messageThread*) args);
     int verificacion;
 
     while (1) {
-        sem_wait(msg.initTask);
-        verificacion = msg.values->type;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        verificacion = msg.buffer[*(msg.readPos)]->type;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         if (verificacion) {
             printf("\t\tTAREA B: Realizando verificación de frenos, requiere una unidad de tiempo\n");
@@ -313,21 +394,26 @@ void* tareaB(void* args) {
         }
 
         printf("\t\tTerminó una TAREA B\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);
 }
 
+/*
+ * Funcionalidad que debe seguir una tarea de tipo C.
+ */
 void* tareaC(void* args) {
     msgThread msg = *((struct messageThread*) args);
     int reparacion, ruedas;
 
     while (1) {
-        sem_wait(msg.initTask);
-        reparacion = msg.values->type;
-        ruedas = msg.values->extraArg;
-        sem_post(msg.nextTask);
+        sem_wait(msg.fullBuffer);
+        sem_wait(msg.mutexBuffer);
+        reparacion = msg.buffer[*(msg.readPos)]->type;
+        ruedas = msg.buffer[*(msg.readPos)]->extraArg;
+        *(msg.readPos) = (*(msg.readPos) + 1) % msg.bufferSize;
+        sem_post(msg.mutexBuffer);
 
         if (reparacion) {
             printf("\t\tTAREA C: Realizando trabajo de reparación de ruedas, hay %d rueda/s que necesita/n reparación, se requiere/n %d unidad/es de tiempo\n", ruedas, reparacion);
@@ -339,7 +425,7 @@ void* tareaC(void* args) {
         }
 
         printf("\t\tTerminó una TAREA C\n");
-        sem_post(msg.finishTask);
+        sem_post(msg.endedTask);
     }
 
     pthread_exit(NULL);

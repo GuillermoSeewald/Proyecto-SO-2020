@@ -14,8 +14,8 @@ typedef struct arguments params;
 
 sem_t heladera;
 sem_t botellas;
-sem_t mutex_comprar;
-sem_t comprar;
+sem_t mutex_avisoComprar;
+sem_t avisoComprar;
 
 void* companiero(void* args);
 
@@ -23,8 +23,8 @@ int main() {
 	pthread_t companieros[CANTIDAD_COMPANIEROS];
 	sem_init(&botellas,0,CANTIDAD_BOTELLAS);
 	sem_init(&heladera,0,1);
-	sem_init(&mutex_comprar,0,1);
-	sem_init(&comprar,0,0);
+	sem_init(&mutex_avisoComprar,0,1);
+	sem_init(&avisoComprar,0,0);
 	int i;
 	for (i=0; i<CANTIDAD_COMPANIEROS; i++) {
 		params* args = (params*) malloc(sizeof(params));
@@ -49,18 +49,18 @@ void* companiero(void* args) {
 			if (sem_trywait(&botellas)==0)
 				sem_post(&botellas);
 			else {
-				sem_wait(&mutex_comprar);
+				sem_wait(&mutex_avisoComprar);
 				printf("\e[%dmSoy el compañero %d\e[0m, se terminaron las botellas, aviso que hay que comprar\n", 94+num, num);
-				sem_post(&comprar);
-				sem_post(&mutex_comprar);
+				sem_post(&avisoComprar);
+				sem_post(&mutex_avisoComprar);
 			}
 		}
 		sem_post(&heladera);
 
 		sleep(1);
 
-		sem_wait(&mutex_comprar);
-		if (sem_trywait(&comprar)==0) {
+		sem_wait(&mutex_avisoComprar);
+		if (sem_trywait(&avisoComprar)==0) {
 			printf("\e[%dmSoy el compañero %d\e[0m, comprando botellas\n", 94+num, num);
 			sem_wait(&heladera);
 			for (i=0; i<CANTIDAD_BOTELLAS; i++) {
@@ -70,6 +70,6 @@ void* companiero(void* args) {
 			printf("\e[%dmSoy el compañero %d\e[0m, terminé de comprar botellas\n", 94+num, num);
 			sem_post(&heladera);
 		}
-		sem_post(&mutex_comprar);
+		sem_post(&mutex_avisoComprar);
 	}
 }

@@ -17,11 +17,14 @@ typedef struct customerMessage {
     char gettingVegeMenuMessage[COLUMN_SIZE];
     char leavingTableMessage[COLUMN_SIZE];
     char finish[COLUMN_SIZE];
-} *custMsg;
+} custMsg;
 
-custMsg getCustomerMessages(int id);
+custMsg messages;
+
+void getCustomerMessages(int id);
 void customerWork(int id);
-int finish(int queueId);
+key_t getKey();
+int getQueue(key_t key);
 
 int main(int argc, char **argv) {
     if (argc == 2) {
@@ -37,73 +40,75 @@ int main(int argc, char **argv) {
 
 /*
  * ALGORITMO CLIENTE:
-    - repetir:
-        - espero mesa limpia disponible
-        - ir a mesa
-        - si pido menu carne
-            - espero menu carne
-        - sino, si pido menu vegetariano
-            - espero menu vegetariano
-        - como
-        - libero la mesa (es decir, deja una mesa sucia)
+    - espero mesa limpia disponible
+    - ir a mesa
+    - si pido menu carne
+        - espero menu carne
+    - sino, si pido menu vegetariano
+        - espero menu vegetariano
+    - como
+    - libero la mesa (es decir, deja una mesa sucia)
  */
 void customerWork(int id) {
-    custMsg printMsgs = getCustomerMessages(id);
+    getCustomerMessages(id);
     int columnNumber = 0, menu;
-    long menuType;
     msg msg;
-    char* toPrint;
     int queueId = getQueue(getKey());
 
-    while (!finish(queueId)) {
-        tableRow(columnNumber, printMsgs->waitingTableMessage);
+    while (1) {
+        tableRow(columnNumber, messages.waitingTableMessage);
         msgrcv(queueId, &msg, SIZE_MSG, TYPE_CLEAN_TABLES, 0);
-        menu = rand() % MAX_FOOD_TYPES;
-        tableRow(columnNumber, printMsgs->gettingTableMessage);
-        if (menu) {
-            msg.id = TYPE_ORDER_MEAT_MENU;
-            toPrint = printMsgs->orderingMeatMessage;
+        menu = id % 2;
+        tableRow(columnNumber, messages.gettingTableMessage);
+        msg.id = TYPE_ORDER_MENU;
+        if (menu) { // Menu carne
+            msg.menu = MENU_MEAT;
+            tableRow(columnNumber, messages.orderingMeatMessage);
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+            msgrcv(queueId, &msg, SIZE_MSG, TYPE_DELIVERED_MEAT_MENU ,0);
+            tableRow(columnNumber, messages.gettingMeatMenuMessage);
         }
-        else {
-            msg.id = TYPE_ORDER_VEG_MENU;
-            toPrint = printMsgs->orderingVegeMessage;
+        else { // Menu vegetariano
+            msg.menu = MENU_VEGE;
+            tableRow(columnNumber, messages.orderingVegeMessage);
+            msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
+            msgrcv(queueId, &msg, SIZE_MSG, TYPE_DELIVERED_VEG_MENU ,0);
+            tableRow(columnNumber, messages.gettingVegeMenuMessage);
         }
-        tableRow(columnNumber, toPrint);
-        msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
-        if (menu) {
-            menuType = TYPE_DELIVERED_MEAT_MENU;
-            toPrint = printMsgs->gettingMeatMenuMessage;
-        }
-        else {
-            menuType = TYPE_DELIVERED_VEG_MENU;
-            toPrint = printMsgs->gettingVegeMenuMessage;
-        }
-        msgrcv(queueId, &msg, SIZE_MSG, menuType ,0);
-        tableRow(columnNumber, toPrint);
-        tableRow(columnNumber, printMsgs->leavingTableMessage);
+        tableRow(columnNumber, messages.leavingTableMessage);
         msg.id = TYPE_DIRTY_TABLES;
-        msgsnd(queueId, &msg, SIZE_MSG , IPC_NOWAIT);
+        msgsnd(queueId, &msg, SIZE_MSG, IPC_NOWAIT);
     }
-
-    tableRow(columnNumber, printMsgs->finish);
-    free(printMsgs);
-}
-
-int finish(int queueId) {
-    msg msg;
-    return msgrcv(queueId, &msg, SIZE_MSG, TYPE_FINISH_CUSTOMER, IPC_NOWAIT) != -1;
 }
 
 
-custMsg getCustomerMessages(int id) {
-    custMsg msg = (struct customerMessage*) malloc(sizeof(struct customerMessage));
-    sprintf(msg->waitingTableMessage, "%d espera mesa", id);
-    sprintf(msg->gettingTableMessage, "%d obtuvo mesa", id);
-    sprintf(msg->orderingMeatMessage, "%d pidio menu carne", id);
-    sprintf(msg->gettingMeatMenuMessage, "%d obtuvo menu carne", id);
-    sprintf(msg->orderingVegeMessage, "%d pidio menu vege", id);
-    sprintf(msg->gettingVegeMenuMessage, "%d obtuvo menu vege", id);
-    sprintf(msg->leavingTableMessage, "%d termino de comer", id);
-    sprintf(msg->finish, "%d se va", id);
-    return msg;
+
+key_t getKey() {
+	key_t key = ftok(PATH, 1);
+	if(key == (key_t)-1){
+		perror("Error al obtener la clave de la cola de mensajes");
+		exit(-1);
+	}
+    return key;
+}
+
+int getQueue(key_t key) {
+    int queueId = msgget(key, 0777 | IPC_CREAT);
+	if(queueId == -1){
+		perror("Error en la creacion de la cola de mensajes");
+		exit(-1);
+	}
+    return queueId;
+}
+
+
+
+void getCustomerMessages(int id) {
+    sprintf(messages.waitingTableMessage, "%d espera mesa", id);
+    sprintf(messages.gettingTableMessage, "%d obtuvo mesa", id);
+    sprintf(messages.orderingMeatMessage, "%d pidio menu carne", id);
+    sprintf(messages.gettingMeatMenuMessage, "%d obtuvo menu carne", id);
+    sprintf(messages.orderingVegeMessage, "%d pidio menu vege", id);
+    sprintf(messages.gettingVegeMenuMessage, "%d obtuvo menu vege", id);
+    sprintf(messages.leavingTableMessage, "%d termino de comer", id);
 }
